@@ -23,6 +23,7 @@ class EEGDataLoader(object):
 			y = np.copy(A0T['type'])
 			y = y[0,0:X.shape[0]:1]
 			y = np.asarray(y, dtype=np.int32)
+			X = X[:, :-3]
 			# generate a list of 50 non-repeating indices in the range [0, 288)
 			random_indices = set(np.random.choice(X.shape[0], 50, replace=False))
 			cur_x, cur_y, cur_x_test, cur_y_test = [], [], [], []
