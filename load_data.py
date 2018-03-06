@@ -20,6 +20,7 @@ class EEGDataLoader(object):
 		for file in data_files:
 			A0T = h5py.File(file, 'r')
 			X = np.copy(A0T['image'])
+			X = np.clip(X, a_min = np.finfo(float).eps, a_max = None)
 			y = np.copy(A0T['type'])
 			y = y[0,0:X.shape[0]:1]
 			y = np.asarray(y, dtype=np.int32)
