@@ -13,7 +13,8 @@ class EEGDataLoader(object):
 			y_test np.array of shpe (9, 50), testing labels
 		"""
 		np.random.seed(239)
-		dataset_path = 'project_datasets/'
+		dataset_path ='drive/239 Project/project/project_datasets/'
+		# dataset_path = 'project_datasets/' for not google drive
 		data_files = [dataset_path + 'A0{}T_slice.mat'.format(i) for i in range(1, 10)]
 		X_train, y_train, X_test, y_test = [], [], [], []
 		# go through each file and parse the data
