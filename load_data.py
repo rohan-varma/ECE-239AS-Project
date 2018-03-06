@@ -29,9 +29,9 @@ class EEGDataLoader(object):
 			X = np.delete(X,np.asarray(nan_trials),axis = 0)
 			X = X[X != NaN]
 			y = np.copy(A0T['type'])
+			y = np.delete(y, np.asarray(nan_trials))
 			y = y[0,0:X.shape[0]:1]
 			y = np.asarray(y, dtype=np.int32)
-			y = np.delete(y, np.asarray(nan_trials))
 			X = X[:, :-3]
 			# generate a list of 50 non-repeating indices in the range [0, 288)
 			random_indices = set(np.random.choice(X.shape[0], 50, replace=False))
