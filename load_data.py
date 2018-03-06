@@ -1,4 +1,5 @@
 import numpy as np
+import math as math
 import h5py
 from sklearn.model_selection import train_test_split
 
@@ -20,12 +21,18 @@ class EEGDataLoader(object):
 		for file in data_files:
 			A0T = h5py.File(file, 'r')
 			X = np.copy(A0T['image'])
-			X = np.nan_to_num(X)
+			nan_trials = []
+			for i in range(X.shape[0]):
+ 				for j in range(X.shape[1]):
+       					if math.isnan(X[i,j,0]):
+            					nan_trials.append(i) 
+			X = np.delete(X,np.asarray(nan_trials),axis = 0)
+			X = X[X != NaN]
 			y = np.copy(A0T['type'])
 			y = y[0,0:X.shape[0]:1]
 			y = np.asarray(y, dtype=np.int32)
+			y = np.delete(y, np.asarray(nan_trials))
 			X = X[:, :-3]
-			print(X.shape)
 			# generate a list of 50 non-repeating indices in the range [0, 288)
 			random_indices = set(np.random.choice(X.shape[0], 50, replace=False))
 			cur_x, cur_y, cur_x_test, cur_y_test = [], [], [], []
