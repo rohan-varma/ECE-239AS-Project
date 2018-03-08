@@ -122,6 +122,9 @@ def train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enab
                 nn.utils.clip_grad_norm(model.parameters(), 0.99)
                 if k % 50 == 0 and verbose: print("loss at timestep {}: {}".format(k, loss.data[0]))
             lastpred = np.argmax(scores.cpu().data.numpy().reshape(4))
+            # save the model after every 1k timesteps
+            print('saving model weights to path ./model.dat')
+            torch.save(model.state_dict(), 'model.dat')
             if verbose: print("Predicted label at last timestep: {}, actual label: {}".format(lastpred, y_train[i][j] % 769))
             if verbose: print("average loss after from previous 1000 timesteps: {}".format(accumulated_loss/1000))
 
@@ -159,23 +162,26 @@ if __name__ == '__main__':
     parser.add_argument('--use-gpu', dest='use_gpu', action='store_true', default=False, help='CUDA enabled or not.')
     parser.add_argument('--no-verbose', dest='no_verbose', action='store_true', default=False, help='Turn off verbose logging.')
     parser.add_argument('--lr', dest='lr', type=float, default = 0.0001, help='Optimizer learning rate hyperparameter.')
+    parser.add_argument('--load', dest='load', type=str, default=None, help='Path to pretrained model weights.')
     args = parser.parse_args()
     print('----MODEL ARGUMENTS------')
     print("Using GPU: {}".format(args.use_gpu))
     print("LSTM bidirectional: {}".format(args.bidirectional))
     print("Learning rate: {}".format(args.lr))
     print("Verbosity: {}".format(not args.no_verbose))
+    print('Path to pretrained: {}'.format(args.load))
     print('initializing model')
-    model = EEGLSTM(seq_len=1, input_dim=22, hidden_dim=20, output_dim=4, batch_size = 1, bidirectional=args.bidirectional) # seq len, input dim, hidden dim, output dim, biirectional
+    model = EEGLSTM(seq_len=1, input_dim=22, hidden_dim=20, output_dim=4, batch_size = 1, bidirectional=args.bidirectional, gpu_enabled=args.use_gpu) # seq len, input dim, hidden dim, output dim, biirectional
     # .cuda() if use gpu
     if args.use_gpu:
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
         model.cuda()
-
+        model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
+    # model.load_state_dict(torch.load(PATH))
     loss_function = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     data_loader = EEGDataLoader('project_datasets/')
     print('loading data')
     X_train, y_train, X_test, y_test = data_loader.load_all_data()
-    train_one_by_one(model, loss_function, optimizer, X_train, y_train)
+    train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose)
