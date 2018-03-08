@@ -1,9 +1,13 @@
 import numpy as np
 import math as math
 import h5py
+import sys
 from sklearn.model_selection import train_test_split
 
 class EEGDataLoader(object):
+	def __init__(self, data_path):
+		self.data_path = data_path #'drive/239 Project/project/project_datasets/' or 'project_datasets/'
+
 	def load_all_data(self):
 		"""Loads all the data from the EEG dataset.
 		The testing data are made by randomly sampling 50 points from each of the 9 datasets, and then concatenating them together
@@ -14,7 +18,7 @@ class EEGDataLoader(object):
 			y_test np.array of shpe (9, 50), testing labels
 		"""
 		np.random.seed(239)
-		dataset_path ='drive/239 Project/project/project_datasets/'
+		dataset_path = self.data_path
 		# dataset_path = 'project_datasets/' for not google drive
 		data_files = [dataset_path + 'A0{}T_slice.mat'.format(i) for i in range(1, 10)]
 		X_train, y_train, X_test, y_test = [], [], [], []
@@ -22,19 +26,25 @@ class EEGDataLoader(object):
 		for file in data_files:
 			A0T = h5py.File(file, 'r')
 			X = np.copy(A0T['image'])
-			x_org = X.shape[0]
-			nan_trials = []
-			for i in range(X.shape[0]):
- 				for j in range(X.shape[1]):
-       					if math.isnan(X[i,j,0]):
-            					nan_trials.append(i) 
-			X = np.delete(X,np.asarray(nan_trials),axis = 0)
-			X = X[X != NaN]
+			X = np.clip(X, a_min = np.finfo(float).eps, a_max = None)
 			y = np.copy(A0T['type'])
-			y = y[0,0:x_org:1]
+			y = y[0,0:X.shape[0]:1]
 			y = np.asarray(y, dtype=np.int32)
-			y = np.delete(y, np.asarray(nan_trials))
 			X = X[:, :-3]
+			print(X.shape)
+			# x_org = X.shape[0]
+			# nan_trials = []
+			# for i in range(X.shape[0]):
+ 		# 		for j in range(X.shape[1]):
+   #     					if math.isnan(X[i,j,0]):
+   #          					nan_trials.append(i) 
+			# X = np.delete(X,np.asarray(nan_trials),axis = 0)
+			# X = X[X != NaN]
+			# y = np.copy(A0T['type'])
+			# y = y[0,0:x_org:1]
+			# y = np.asarray(y, dtype=np.int32)
+			# y = np.delete(y, np.asarray(nan_trials))
+			# X = X[:, :-3]
 			# generate a list of 50 non-repeating indices in the range [0, 288)
 			random_indices = set(np.random.choice(X.shape[0], 50, replace=False))
 			cur_x, cur_y, cur_x_test, cur_y_test = [], [], [], []
@@ -89,7 +99,11 @@ class EEGDataLoader(object):
 
 
 if __name__ == '__main__':
-	data_loader = EEGDataLoader()
+	if len(sys.argv) != 2:
+		print('USAGE: python3 load_data.py PATH')
+	else:
+		data_path = sys.argv[1]
+	data_loader = EEGDataLoader(data_path)
 	X_train, y_train, x_test, y_test = data_loader.load_all_data()
 	print(X_train.shape, y_train.shape, x_test.shape, y_test.shape)
 	x_train, y_train, x_val, y_val = data_loader.get_train_validation_splits()
