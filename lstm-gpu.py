@@ -176,7 +176,7 @@ if __name__ == '__main__':
     if args.use_gpu:
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
         model.cuda()
-        model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
+       # model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
     # model.load_state_dict(torch.load(PATH))
     loss_function = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
