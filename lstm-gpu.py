@@ -43,11 +43,11 @@ class EEGLSTM(nn.Module):
         bidirectional_mult = 2 if self.bidirectional else 1
         # hidden state and cell state
         if self.gpu_enabled:
-            return (autograd.Variable(torch.zeros(1 * bidirectional_mult, 1, hidden_dim)).cuda(),
-                autograd.Variable(torch.zeros(1 * bidirectional_mult, 1, hidden_dim)).cuda())
+            return (autograd.Variable(torch.zeros(1 * bidirectional_mult, self.batch_size, hidden_dim)).cuda(),
+                autograd.Variable(torch.zeros(1 * bidirectional_mult, self.batch_size, hidden_dim)).cuda())
         else:
-            return (autograd.Variable(torch.zeros(1 * bidirectional_mult, 1, hidden_dim)),
-                autograd.Variable(torch.zeros(1 * bidirectional_mult, 1, hidden_dim)))
+            return (autograd.Variable(torch.zeros(1 * bidirectional_mult, self.batch_size, hidden_dim)),
+                autograd.Variable(torch.zeros(1 * bidirectional_mult, self.batch_size, hidden_dim)))
     
     def forward(self, input):
         """forwards input through the model"""
@@ -57,12 +57,12 @@ class EEGLSTM(nn.Module):
         else:
             input = autograd.Variable(torch.FloatTensor(input)).contiguous()
         # LSTM expects 3-D input: dim of input is expected to be seq_len, batch size, input size
-        input = input.view(self.seq_len, 1, -1) # present the sequence seq_len timesteps at a time
+        input = input.view(self.seq_len, self.batch_size, -1) # present the sequence seq_len timesteps at a time
         lstm_out, self.hidden = self.lstm(input, self.hidden)
-        scores = self.linear(lstm_out.view(self.seq_len,-1))
+        scores = self.linear(lstm_out.view(self.seq_len, self.batch_size, -1)).view(self.batch_size, self.output_dim)
         return scores
 
-def train_seq(X_train, y_train, gpu_enabled=False, verbose=True):
+def train_seq(model, loss_function, optimizer, X_train, y_train, gpu_enabled=False, verbose=True):
     for i in range(X_train.shape[0]):
         for j in range(X_train.shape[1]):
             # model.init_hidden(hidden_dim=20)
@@ -70,15 +70,15 @@ def train_seq(X_train, y_train, gpu_enabled=False, verbose=True):
             if gpu_enabled:
                 label = autograd.Variable(torch.LongTensor([int(label % 769)] * 1000).cuda())
             else:
-                label = autograd.Variable(torch.LongTensor([int(label % 769)] * 1000).cuda())
+                label = autograd.Variable(torch.LongTensor([int(label % 769)] * 1000))
             sample = X_train[i][j]
             if np.any(np.isnan(sample)):
                 print("skipping sample with NaN")
                 continue
             assert not np.any(np.isnan(sample))
             model.zero_grad()
-            scores = model(sample.cuda())
-            loss = loss_function(scores.cuda(), label.cuda())
+            scores = model(sample.cuda() if gpu_enabled else sample)
+            loss = loss_function(scores.cuda() if gpu_enabled else scores, label.cuda() if gpu_enabled else label)
             loss.backward(retain_graph = True)
             optimizer.step()
              # clip the gradient to prevent exploding gradients (probably not needed)
@@ -86,6 +86,63 @@ def train_seq(X_train, y_train, gpu_enabled=False, verbose=True):
             if verbose:
                 print(loss.data[0])
         break
+
+def train_batch(model, loss_function, optimizer, X_train, y_train, gpu_enabled=False, verbose=True):
+    j = 0
+    max_j = X_train.shape[1]
+    assert X_train.shape[1] == y_train.shape[1], "{} {}".format(X_train.shape[1], y_train.shape[1])
+    for i in range(X_train.shape[0]):
+        # add verbose logging
+        if j + 50 >= max_j:
+            break
+        batch = X_train[i][j:j+50]
+        labels = y_train[i][j:j+50]
+        if np.any(np.isnan(batch)):
+            print('skipping sample with nans')
+            continue
+        j+=50
+        assert not np.any(np.isnan(batch))
+        labels = autograd.Variable(torch.LongTensor([int(label % 769) for label in list(labels)]))
+        accumulated_loss = 0
+        for k in range(batch.shape[2]):
+            #model.zero_grad()
+            input = batch[:,:,k]
+            scores = model(input)
+            loss = loss_function(scores.cuda() if gpu_enabled else scores, labels.cuda() if gpu_enabled else labels)
+            accumulated_loss+=loss.data[0]
+            out = loss.backward(retain_graph=True)
+            optimizer.step()
+            nn.utils.clip_grad_norm(model.parameters(), 0.99)
+            if k % 50 == 0 and verbose: print("loss at timestep {}: {}".format(k, loss.data[0]))
+        print('average loss frm previous 1000 timesteps: {}'.format(accumulated_loss/batch.shape[2]))
+
+        # accumulated_loss = 0
+        #     # present the seq across 1k timesteps, building up the state one at a time
+        #     for k in range(sample.shape[0]):
+        #         model.zero_grad()
+        #         input = sample[0]
+        #         assert input.shape[0] == 22
+        #         scores = model(input)
+        #         loss = loss_function(scores.cuda() if gpu_enabled else scores, label.cuda() if gpu_enabled else label)
+        #         accumulated_loss +=loss.data[0]
+        #         out = loss.backward(retain_graph = True)
+        #         optimizer.step()
+        #         # clip the gradient to prevent exploding gradients (probably not needed)
+        #         nn.utils.clip_grad_norm(model.parameters(), 0.99)
+        #         if k % 50 == 0 and verbose: print("loss at timestep {}: {}".format(k, loss.data[0]))
+        #     lastpred = np.argmax(scores.cpu().data.numpy().reshape(4))
+        #     # save the model after every 1k timesteps
+        #     print('saving model weights to path ./model.dat')
+        #     torch.save(model.state_dict(), 'model.dat')
+        #     if verbose: print("Predicted label at last timestep: {}, actual label: {}".format(lastpred, y_train[i][j] % 769))
+        #     if verbose: print("average loss after from previous 1000 timesteps: {}".format(accumulated_loss/1000))
+        # for i in range(batch.shape[2]):
+        #     scores = model(batch[:,:,i])
+        scores = model(batch[:,:,i])
+        loss = loss_function(scores.cuda() if gpu_enabled else scores, labels.cuda() if gpu_enabled else labels)
+        print(loss.data[0])
+        print(scores.shape)
+        exit()
 
 def train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enabled=False, verbose=True):
     i, j = 0, 0
@@ -163,6 +220,8 @@ if __name__ == '__main__':
     parser.add_argument('--no-verbose', dest='no_verbose', action='store_true', default=False, help='Turn off verbose logging.')
     parser.add_argument('--lr', dest='lr', type=float, default = 0.0001, help='Optimizer learning rate hyperparameter.')
     parser.add_argument('--load', dest='load', type=str, default=None, help='Path to pretrained model weights.')
+    parser.add_argument('--seq-len', dest='seq_len', type=int, default=1, help ='Sequence length from 1 to 1k')
+    parser.add_argument('--batch', type=int, default=1, help='Batch size to use (like 250)')
     args = parser.parse_args()
     print('----MODEL ARGUMENTS------')
     print("Using GPU: {}".format(args.use_gpu))
@@ -170,8 +229,10 @@ if __name__ == '__main__':
     print("Learning rate: {}".format(args.lr))
     print("Verbosity: {}".format(not args.no_verbose))
     print('Path to pretrained: {}'.format(args.load))
+    print('Sequence length: {}'.format(args.seq_len))
+    print('Batch size: {}'.format(args.batch))
     print('initializing model')
-    model = EEGLSTM(seq_len=1, input_dim=22, hidden_dim=20, output_dim=4, batch_size = 1, bidirectional=args.bidirectional, gpu_enabled=args.use_gpu) # seq len, input dim, hidden dim, output dim, biirectional
+    model = EEGLSTM(seq_len=args.seq_len, input_dim=22, hidden_dim=20, output_dim=4, batch_size = args.batch, bidirectional=args.bidirectional, gpu_enabled=args.use_gpu) # seq len, input dim, hidden dim, output dim, biirectional
     # .cuda() if use gpu
     if args.use_gpu:
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
@@ -184,4 +245,13 @@ if __name__ == '__main__':
     data_loader = EEGDataLoader('project_datasets/')
     print('loading data')
     X_train, y_train, X_test, y_test = data_loader.load_all_data()
-    train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose)
+    print('Beginning training: sequence length of {}'.format(args.seq_len))
+    if args.seq_len == 1:
+        # train one by one
+        if args.batch == 1:
+            train_batch(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose)
+        else:
+            train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose)
+
+    else:
+        train_seq(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose)
