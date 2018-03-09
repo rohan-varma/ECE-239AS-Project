@@ -87,23 +87,24 @@ def train_seq(model, loss_function, optimizer, X_train, y_train, gpu_enabled=Fal
                 print(loss.data[0])
         break
 
-def train_batch(model, loss_function, optimizer, X_train, y_train, gpu_enabled=False, verbose=True):
+def train_batch(model, loss_function, optimizer, X_train, y_train, gpu_enabled=False, verbose=True, batch_size = 50):
     j = 0
     max_j = X_train.shape[1]
     assert X_train.shape[1] == y_train.shape[1], "{} {}".format(X_train.shape[1], y_train.shape[1])
     for i in range(X_train.shape[0]):
         # add verbose logging
-        if j + 50 >= max_j:
+        if j + batch_size >= max_j:
             break
-        batch = X_train[i][j:j+50]
-        labels = y_train[i][j:j+50]
+        batch = X_train[i][j:j+batch_size]
+        labels = y_train[i][j:j+batch_size]
         if np.any(np.isnan(batch)):
             print('skipping sample with nans')
             continue
-        j+=50
+        j+=batch_size
         assert not np.any(np.isnan(batch))
         labels = autograd.Variable(torch.LongTensor([int(label % 769) for label in list(labels)]))
         accumulated_loss = 0
+        hidden = model.init_hidden(20)
         for k in range(batch.shape[2]):
             #model.zero_grad()
             input = batch[:,:,k]
@@ -163,7 +164,7 @@ def train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enab
                 label = autograd.Variable(torch.LongTensor([int(label % 769)]).cuda())
             else:
                 label = autograd.Variable(torch.LongTensor([int(label % 769)]))
-#            model.hidden = model.init_hidden(20)
+            model.hidden = model.init_hidden(20) #RM THIS MAYBE
             accumulated_loss = 0
             # present the seq across 1k timesteps, building up the state one at a time
             for k in range(sample.shape[0]):
@@ -248,8 +249,9 @@ if __name__ == '__main__':
     print('Beginning training: sequence length of {}'.format(args.seq_len))
     if args.seq_len == 1:
         # train one by one
-        if args.batch == 1:
-            train_batch(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose)
+        if args.batch != 1:
+            print("USING BATCH SIZE {}".format(args.batch))
+            train_batch(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose, batch_size = args.batch)
         else:
             train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose)
 
