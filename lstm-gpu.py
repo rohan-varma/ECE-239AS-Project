@@ -76,7 +76,7 @@ def train_seq(model, loss_function, optimizer, X_train, y_train, gpu_enabled=Fal
                 print("skipping sample with NaN")
                 continue
             assert not np.any(np.isnan(sample))
-            model.zero_grad()
+            optimizer.zero_grad()
             scores = model(sample.cuda() if gpu_enabled else sample)
             loss = loss_function(scores.cuda() if gpu_enabled else scores, label.cuda() if gpu_enabled else label)
             loss.backward(retain_graph = True)
@@ -106,7 +106,7 @@ def train_batch(model, loss_function, optimizer, X_train, y_train, gpu_enabled=F
         accumulated_loss = 0
         hidden = model.init_hidden(20)
         for k in range(batch.shape[2]):
-            #model.zero_grad()
+            optimizer.zero_grad()
             input = batch[:,:,k]
             scores = model(input)
             loss = loss_function(scores.cuda() if gpu_enabled else scores, labels.cuda() if gpu_enabled else labels)
@@ -168,7 +168,7 @@ def train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enab
             accumulated_loss = 0
             # present the seq across 1k timesteps, building up the state one at a time
             for k in range(sample.shape[0]):
-                model.zero_grad()
+                optimizer.zero_grad()
                 input = sample[0]
                 assert input.shape[0] == 22
                 scores = model(input)

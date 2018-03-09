@@ -6,6 +6,7 @@ from torch.autograd import Variable
 from torch import autograd
 from load_data import EEGDataLoader
 import sys
+import torch.nn.functional as F
 import numpy as np
 # Hyper Parameters
 num_epochs = 5
@@ -25,13 +26,32 @@ class CNN(nn.Module):
             nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(2))
-        self.fc = nn.Linear(40000, 10)
+        self.layer3 = nn.Sequential(
+            nn.Conv2d(32, 96, kernel_size=3, padding=2),
+            nn.BatchNorm2d(96),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            )
+        self.layer4 = nn.Sequential(
+            nn.Conv2d(96, 128, kernel_size=3, padding=2),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            )
+        self.fc1 = nn.Sequential(
+            nn.Linear(16384, 800),
+            nn.ReLU(),
+            )
+        self.out = nn.Linear(800, 10)
         
     def forward(self, x):
         out = self.layer1(x)
         out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
         out = out.view(out.size(0), -1)
-        out = self.fc(out)
+        out = self.fc1(out)
+        out = self.out(out)
         return out
         
 cnn = CNN()
@@ -48,6 +68,7 @@ X_train, y_train, X_test, y_test = data_loader.load_all_data()
 
 # train the model
 for i in range(X_train.shape[0]):
+    print(i)
     X_trial, y_trial = X_train[i], y_train[i]
     for j in range(X_trial.shape[0]):
         image, label = X_trial[j], y_trial[j]
@@ -55,8 +76,17 @@ for i in range(X_train.shape[0]):
             print('skipping a nan entry')
             continue
         assert not np.any(np.isnan(image))
-        print(image.shape)
-        image = autograd.Variable(torch.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
+        if len(sys.argv) > 1:
+            image = autograd.Variable(torch.cuda.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
+            label = autograd.Variable(torch.cuda.FloatTensor([label %769]))
+        else:
+            image = autograd.Variable(torch.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
+            label = autograd.Variable(torch.LongTensor([int(label %769)]))
+        optimizer.zero_grad()
         scores = cnn(image)
-        print(scores.shape)
-        print(label)
+        loss = criterion(scores, label)
+        if j % 20 == 0:
+            print(j)
+            print(loss.data[0])
+        loss.backward()
+        optimizer.step()
