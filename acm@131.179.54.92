@@ -113,30 +113,8 @@ for epoch in range(100):
 
 # gauge accuracy on the training dataset
 predictions = []
-labels = []
 for i in range(X_train.shape[0]):
-    image, label = X_train[i], y_train[i]
-    labels.append(label)
-    if np.any(np.isnan(image)):
-        print('skipping a nan entry')
-        continue
-    if use_gpu:
-        image = autograd.Variable(torch.cuda.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
-        label = autograd.Variable(torch.cuda.LongTensor([int(label %769)]))
-    else:
-        image = autograd.Variable(torch.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
-        label = autograd.Variable(torch.LongTensor([int(label %769)]))
-    optimizer.zero_grad()
-    scores = cnn(image)
-    prediction = np.argmax(scores.data.numpy())
-    predictions.append(prediction)
-
-diffs = [1 if prediction != label else 0 for prediction, label in zip(predictions, labels)]
-error = sum(diffs)/len(diffs)
-print("accuracy: {}".format(1 - error))
-
-
-
+    pass # TODO
 
 # for i in range(X_train.shape[0]):
 #     print(i)
