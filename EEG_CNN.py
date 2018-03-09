@@ -108,7 +108,6 @@ for epoch in range(10):
         scores = cnn(image)
         loss = criterion(scores, label)
         if i % 20 == 0:
-            print(i)
             print(loss.data[0])
         loss.backward()
         optimizer.step()
