@@ -92,7 +92,7 @@ X_train, y_train, X_test, y_test = data_loader.load_all_data()
 X_train, y_train = X_train[0], y_train[0] # 238 * 22 * 1000 or something
 for epoch in range(10):
     # 10 epochs, 10 images
-    for i in range(10):
+    for i in range(X_train.shape[0]):
         print(i)
         image, label = X_train[i], y_train[i]
         if np.any(np.isnan(image)):
