@@ -81,6 +81,7 @@ cnn.eval()    # Change model to 'eval' mode (BN uses moving mean/var).
 correct = 0
 total = 0
 for images, labels in test_loader:
+    print(type(images))
     images = Variable(images).cuda()
     outputs = cnn(images)
     _, predicted = torch.max(outputs.data, 1)
