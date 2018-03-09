@@ -78,7 +78,7 @@ for i in range(X_train.shape[0]):
         assert not np.any(np.isnan(image))
         if len(sys.argv) > 1:
             image = autograd.Variable(torch.cuda.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
-            label = autograd.Variable(torch.cuda.FloatTensor([label %769]))
+            label = autograd.Variable(torch.cuda.LongTensor([int(label %769)]))
         else:
             image = autograd.Variable(torch.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
             label = autograd.Variable(torch.LongTensor([int(label %769)]))
