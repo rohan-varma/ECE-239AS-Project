@@ -16,42 +16,63 @@ learning_rate = 0.001
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        self.layer1 = nn.Sequential(
+        self.conv1 = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=5, padding=2),
             nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.MaxPool2d(2))
-        self.layer2 = nn.Sequential(
+        self.conv2 = nn.Sequential(
             nn.Conv2d(16, 32, kernel_size=5, padding=2),
             nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(2))
-        self.layer3 = nn.Sequential(
+        self.conv3 = nn.Sequential(
             nn.Conv2d(32, 96, kernel_size=3, padding=2),
             nn.BatchNorm2d(96),
             nn.ReLU(),
-            nn.MaxPool2d(2),
-            )
-        self.layer4 = nn.Sequential(
-            nn.Conv2d(96, 128, kernel_size=3, padding=2),
-            nn.BatchNorm2d(128),
+            nn.MaxPool2d(2))
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(96, 256, kernel_size=3, padding=2),
+            nn.BatchNorm2d(256),
             nn.ReLU(),
-            nn.MaxPool2d(2),
-            )
+            nn.MaxPool2d(2))
+        self.conv5 = nn.Sequential(
+            nn.Conv2d(256, 512, kernel_size=3, padding=2),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(2))
+        self.conv6 = nn.Sequential(
+            nn.Conv2d(512, 1024, kernel_size=3, padding=2),
+            nn.BatchNorm2d(1024),
+            nn.ReLU(),
+            nn.MaxPool2d(2))
         self.fc1 = nn.Sequential(
-            nn.Linear(16384, 800),
-            nn.ReLU(),
+            nn.Linear(33792, 1024),
+            nn.ReLU()
             )
-        self.out = nn.Linear(800, 10)
+        self.fc2 = nn.Sequential(
+            nn.Linear(1024, 800),
+            nn.ReLU()
+            )
+        self.fc3 = nn.Sequential(
+            nn.Linear(800, 256),
+            nn.ReLU()
+            )
+        self.fc4 = nn.Sequential(
+            nn.Linear(256, 10)
+            )
         
     def forward(self, x):
-        out = self.layer1(x)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.conv3(out)
+        out = self.conv4(out)
+        out = self.conv5(out)
         out = out.view(out.size(0), -1)
         out = self.fc1(out)
-        out = self.out(out)
+        out = self.fc2(out)
+        out = self.fc3(out)
+        out = self.fc4(out)
         return out
         
 cnn = CNN()
