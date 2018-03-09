@@ -62,6 +62,8 @@ optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
 # Train the Model
 for epoch in range(num_epochs):
     for i, (images, labels) in enumerate(train_loader):
+        print(images.shape)
+        print(type(images))
         images = Variable(images).cuda()
         labels = Variable(labels).cuda()
         
@@ -83,6 +85,7 @@ total = 0
 for images, labels in test_loader:
     print(type(images))
     images = Variable(images).cuda()
+    print(images.shape)
     outputs = cnn(images)
     _, predicted = torch.max(outputs.data, 1)
     total += labels.size(0)
