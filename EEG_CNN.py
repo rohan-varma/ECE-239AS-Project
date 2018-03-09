@@ -90,9 +90,9 @@ X_train, y_train, X_test, y_test = data_loader.load_all_data()
 
 # overfit small dataset
 X_train, y_train = X_train[0], y_train[0] # 238 * 22 * 1000 or something
-for epoch in range(10):
+for epoch in range(100):
     # 10 epochs, 10 images
-    for i in range(20):
+    for i in range(X_train.shape[0]):
         image, label = X_train[i], y_train[i]
         if np.any(np.isnan(image)):
             print('skipping a nan entry')
