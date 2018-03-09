@@ -25,7 +25,7 @@ class CNN(nn.Module):
             nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(2))
-        self.fc = nn.Linear(7*7*32, 10)
+        self.fc = nn.Linear(40000, 10)
         
     def forward(self, x):
         out = self.layer1(x)
@@ -55,7 +55,8 @@ for i in range(X_train.shape[0]):
             print('skipping a nan entry')
             continue
         assert not np.any(np.isnan(image))
-        image = autograd.Variable(torch.FloatTensor(image))
+        print(image.shape)
+        image = autograd.Variable(torch.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
         scores = cnn(image)
         print(scores.shape)
         print(label)
