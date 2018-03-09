@@ -106,9 +106,6 @@ for epoch in range(10):
             label = autograd.Variable(torch.LongTensor([int(label %769)]))
         optimizer.zero_grad()
         scores = cnn(image)
-        print(scores.shape)
-        print(scores.data)
-        print(label.shape)
         loss = criterion(scores, label)
         if i % 20 == 0:
             print(i)
