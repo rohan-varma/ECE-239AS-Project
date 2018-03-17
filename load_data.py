@@ -32,6 +32,17 @@ class EEGDataLoader(object):
 			y = np.asarray(y, dtype=np.int32)
 			X = X[:, :-3]
 			print(X.shape)
+			good_trials_X, good_trials_y = [], []
+			# go through the trials
+			for i in range(X.shape[0]):
+				if np.any(np.isnan(X[i])):
+					print('removing a nan entry')
+					continue
+				else:
+					good_trials_X.append(X[i])
+					good_trials_y.append(y[i])
+			X, y = np.array(good_trials_X), np.array(good_trials_y)
+			print(X.shape, y.shape)
 			# x_org = X.shape[0]
 			# nan_trials = []
 			# for i in range(X.shape[0]):
@@ -67,6 +78,7 @@ class EEGDataLoader(object):
 		# convert result to np array
 		X_train, y_train, X_test, y_test = np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test)
 		self.X_train, self.y_train, self.X_test, self.y_test = X_train, y_train, X_test, y_test
+		print(X_train.shape, y_train.shape, X_test.shape, y_test.shape)
 		return X_train, y_train, X_test, y_test
 
 
@@ -99,13 +111,17 @@ class EEGDataLoader(object):
 
 
 if __name__ == '__main__':
+	print(sys.argv)
 	if len(sys.argv) != 2:
 		print('USAGE: python3 load_data.py PATH')
+		exit(1)
 	else:
 		data_path = sys.argv[1]
 	data_loader = EEGDataLoader(data_path)
 	X_train, y_train, x_test, y_test = data_loader.load_all_data()
+	print('THE GOOD GOOD SHAPES')
 	print(X_train.shape, y_train.shape, x_test.shape, y_test.shape)
+	print('THATS ALL FOLKS')
 	x_train, y_train, x_val, y_val = data_loader.get_train_validation_splits()
 	print(x_train.shape, y_train.shape, x_val.shape, y_val.shape)
 	x, y = data_loader.get_ith_dataset(3)
