@@ -123,27 +123,6 @@ for epoch in range(2000):
             loss.backward()
             optimizer.step()
 
-    # for i in range(X_train.shape[0]):
-    #     image, label = X_train[i], y_train[i]
-    #     if np.any(np.isnan(image)):
-    #         print('skipping a nan entry')
-    #         continue
-    #     if use_gpu:
-    #         image = autograd.Variable(torch.cuda.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
-    #         label = autograd.Variable(torch.cuda.LongTensor([int(label %769)]))
-    #     else:
-    #         image = autograd.Variable(torch.FloatTensor(image.reshape((1, 1, image.shape[0], image.shape[1]))))
-    #         label = autograd.Variable(torch.LongTensor([int(label %769)]))
-    #     optimizer.zero_grad()
-    #     scores = cnn(image)
-    #     loss = criterion(scores, label)
-    #     if i % 20 == 0:
-    #         print(loss.data[0])
-    #         print('predicted: {}, actual: {}'.format(np.argmax(scores.cpu().data.numpy()), y_train[i] % 769))
-    #     loss.backward()
-    #     optimizer.step()
-        #if i == X_train.shape[0]: break # out of the inner loop
-
 # gauge accuracy on the training dataset
 predictions = []
 labels = []

@@ -1,10 +1,3 @@
-
-# coding: utf-8
-
-# #### LSTM For EEG Data
-# - First, import everything we're gonna be using
-
-# In[1]:
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
@@ -14,6 +7,55 @@ import numpy as np
 import argparse
 from load_data import EEGDataLoader
 torch.manual_seed(1)
+
+class EEGGRU(nn.Module):
+
+    def __init__(self, seq_len, input_dim, hidden_dim, output_dim = 4, batch_size = 1, bidirectional=True, gpu_enabled=False):
+        super().__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.seq_len = seq_len
+        self.bidirectional = bidirectional
+        self.gpu_enabled = gpu_enabled
+        self.batch_size = batch_size
+        # components needed for our model
+        # input, hidden size
+        self.gru = nn.GRU(self.input_dim, self.hidden_dim, dropout = 0.5, bidirectional = self.bidirectional)
+        # the result if bidirectional is 2x shape if not bidirectional, so account for that
+        self.linear = nn.Linear(self.hidden_dim * (2 if self.bidirectional else 1), self.output_dim)
+        self.hidden = self.init_hidden(self.hidden_dim)
+        
+        # hidden layer init
+    def init_hidden(self, hidden_dim):
+        """Initialize the hidden state in self.hidden
+        Dimensions are num_layers * minibatch_size * hidden_dim
+        IMPORTANT: Re-initialize this when you want the RNN to forget data (such as training on a new series of timesteps)
+        Don't re-init when it's on the same series (because we want to build up the hidden state)
+        """
+        # num_layers * num_directions, batch, hidden_dim
+        bidirectional_mult = 2 if self.bidirectional else 1
+        # hidden state and cell state
+        if self.gpu_enabled:
+            return autograd.Variable(torch.zeros(1 * bidirectional_mult, self.batch_size, hidden_dim)).cuda()
+        else:
+            return autograd.Variable(torch.zeros(1 * bidirectional_mult, self.batch_size, hidden_dim))
+    
+    def forward(self, input):
+        """forwards input through the model"""
+        # convert the input into something Pytorch can understand
+        if self.gpu_enabled:
+            input = autograd.Variable(torch.FloatTensor(input)).contiguous().cuda()
+        else:
+            input = autograd.Variable(torch.FloatTensor(input)).contiguous()
+        # LSTM expects 3-D input: dim of input is expected to be seq_len, batch size, input size
+        input = input.view(self.seq_len, self.batch_size, -1) # present the sequence seq_len timesteps at a time
+        gru_out, hidden = self.gru(input, self.hidden)
+        m = nn.Dropout(p=0.5)
+        gru_out = m(gru_out) # apply dropout
+        scores = self.linear(gru_out.view(self.seq_len, self.batch_size, -1)).view(self.batch_size, self.output_dim)
+        return scores, hidden
+
 
 class EEGLSTM(nn.Module):
     
@@ -59,9 +101,11 @@ class EEGLSTM(nn.Module):
             input = autograd.Variable(torch.FloatTensor(input)).contiguous()
         # LSTM expects 3-D input: dim of input is expected to be seq_len, batch size, input size
         input = input.view(self.seq_len, self.batch_size, -1) # present the sequence seq_len timesteps at a time
-        lstm_out, self.hidden = self.lstm(input, self.hidden)
+        lstm_out, hidden = self.lstm(input, self.hidden)
+        m = nn.Dropout(p=0.5)
+        lstm_out = m(lstm_out) # apply dropout
         scores = self.linear(lstm_out.view(self.seq_len, self.batch_size, -1)).view(self.batch_size, self.output_dim)
-        return scores
+        return scores, hidden
 
 def train_seq(model, loss_function, optimizer, X_train, y_train, gpu_enabled=False, verbose=True):
     for i in range(X_train.shape[0]):
@@ -108,7 +152,7 @@ def train_batch(model, loss_function, optimizer, X_train, y_train, gpu_enabled=F
         assert not np.any(np.isnan(batch))
         labels = autograd.Variable(torch.LongTensor([int(label % 769) for label in list(labels)]))
         accumulated_loss = 0
-        hidden = model.init_hidden(20)
+        hidden = model.init_hidden(model.hidden_dim)
         for k in range(batch.shape[2]):
             optimizer.zero_grad()
             input = batch[:,:,k]
@@ -145,25 +189,27 @@ def train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enab
             else:
                 label = autograd.Variable(torch.LongTensor([int(label) % 769]))
             # re init the hidden state before we go across tiemsteps
-            model.hidden = model.init_hidden(20)
+            #model.hidden = model.init_hidden(model.hidden_dim)
             acc_loss = 0
             # present the sequence one at a time
             for k in range(trial.shape[1]):
                 optimizer.zero_grad()
+                if k == 500: break
                 #bptt only 100 timesteps
-                if k % 100 == 0:
-                    model.hidden = detach(model.hidden)
+                # if k == 500:
+                #     break # end at 5k timesteps
+                model.hidden = detach(model.hidden)
                 input = trial[:,k]
-                scores = model(input)
+                scores, model.hidden = model(input)
                 loss = loss_function(scores.cuda() if gpu_enabled else scores, label.cuda() if gpu_enabled else label)
                 acc_loss+=loss.data[0]
-                loss.backward(retain_graph=True)
-                optimizer.step()
-                if verbose and k % 100 == 0:
-                    # report the loss and make a prediction
-                    pred = np.argmax(scores.cpu().data.numpy().reshape(4))
-                    print("Timestep: {}, loss: {}, prediction: {}, actual: {}".format(k, loss.data[0], pred + 769, label.data[0] + 769))
+                # if verbose and k % 100 == 0:
+                #     # report the loss and make a prediction
+                #     pred = np.argmax(scores.cpu().data.numpy().reshape(4))
+                #     print("Timestep: {}, loss: {}, prediction: {}, actual: {}".format(k, loss.data[0], pred + 769, label.data[0] + 769))
             # # now that we're done presenting 1k timesteps, get the last prediction
+            loss.backward(retain_graph=True)
+            optimizer.step()
             lastpred = np.argmax(scores.cpu().data.numpy().reshape(4))
             print("After 1k timesteps: pred {} actual {} loss {}".format(lastpred + 769, label.data[0] + 769, loss.data[0])) 
         accs.append(accuracy_single_subject(X_s, y_s))
@@ -178,17 +224,24 @@ def accuracy_single_subject(X_s, y_s):
         trial, label = X_s[j], y_s[j]
         label = autograd.Variable(torch.LongTensor([int(label) % 769]))
         # re init the hidden state before we go across tiemsteps
-        model.hidden = model.init_hidden(20)
+        model.hidden = model.init_hidden(model.hidden_dim)
+        model.zero_grad()
         acc_loss = 0
         # present the sequence one at a time
+        # if k == 500:
+        #     break
+        avgscores = np.zeros(4)
         for k in range(trial.shape[1]):
+            if k == 500: break
             #optimizer.zero_grad()
-            model.hidden = detach(model.hidden) # not sure if I need this line or not
+            #model.hidden = detach(model.hidden) # not sure if I need this line or not
             input = trial[:,k]
-            scores = model(input)
-        lastpred = np.argmax(scores.cpu().data.numpy().reshape(4))
-        predictions.append(lastpred)
-        print("Evaluating accuracy: pred {} actual {}".format(lastpred + 769, label.data[0] + 769)) 
+            scores, model.hidden = model(input)
+            avgscores = avgscores + scores.cpu().data.numpy().reshape(4)
+            avgscores/=(k+1)
+        lp = np.argmax(avgscores.reshape(4))
+        predictions.append(lp)
+        print("Evaluating accuracy: pred {} actual {}".format(lp + 769, label.data[0] + 769)) 
     errs = [1 if (p+769) != l else 0 for p,l in zip(predictions, y_s)]
     error_rate = sum(errs)/len(errs)
     print("Accuracy for this subject: {}".format(1 - error_rate))
@@ -205,6 +258,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch', type=int, default=1, help='Batch size to use (like 250)')
     parser.add_argument('--single-subject', dest='single_subject', action='store_true', default=False,
         help='Train only on a single subject.')
+    parser.add_argument('--hidden-dim', dest='hdim', type=int, default=128, help='Number of hidden units in LSTM')
+    parser.add_argument('--gru', dest='use_gru', action='store_true', default=False, help='Use GRU for hidden units instead of LSTM')
 
     args = parser.parse_args()
     print('----MODEL ARGUMENTS------')
@@ -215,8 +270,13 @@ if __name__ == '__main__':
     print('Path to pretrained: {}'.format(args.load))
     print('Sequence length: {}'.format(args.seq_len))
     print('Batch size: {}'.format(args.batch))
-    print('initializing model')
-    model = EEGLSTM(seq_len=args.seq_len, input_dim=22, hidden_dim=20, output_dim=4, batch_size = args.batch, bidirectional=args.bidirectional, gpu_enabled=args.use_gpu) # seq len, input dim, hidden dim, output dim, biirectional
+    print('Train & validate on single subject; {}'.format(args.single_subject))
+    print('Hidden dim units: {}'.format(args.hdim))
+    print('Hidden unit: {}'.format('GRU' if args.use_gru else 'LSTM'))
+    if args.use_gru:
+        model = EEGGRU(seq_len=args.seq_len, input_dim=22, hidden_dim=args.hdim, output_dim=4, batch_size = args.batch, bidirectional=args.bidirectional, gpu_enabled=args.use_gpu)
+    else:
+        model = EEGLSTM(seq_len=args.seq_len, input_dim=22, hidden_dim=args.hdim, output_dim=4, batch_size = args.batch, bidirectional=args.bidirectional, gpu_enabled=args.use_gpu) # seq len, input dim, hidden dim, output dim, biirectional    
     # .cuda() if use gpu
     if args.use_gpu:
         torch.set_default_tensor_type('torch.cuda.FloatTensor')

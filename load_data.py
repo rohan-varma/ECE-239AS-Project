@@ -31,7 +31,6 @@ class EEGDataLoader(object):
 			y = y[0,0:X.shape[0]:1]
 			y = np.asarray(y, dtype=np.int32)
 			X = X[:, :-3]
-			print(X.shape)
 			good_trials_X, good_trials_y = [], []
 			# go through the trials
 			for i in range(X.shape[0]):
@@ -39,10 +38,10 @@ class EEGDataLoader(object):
 					print('removing a nan entry')
 					continue
 				else:
+					X[i] = (X[i] - np.mean(X[i], axis = 0)) /(np.std(X[i], axis = 0) + np.finfo(float).eps)
 					good_trials_X.append(X[i])
 					good_trials_y.append(y[i])
 			X, y = np.array(good_trials_X), np.array(good_trials_y)
-			print(X.shape, y.shape)
 			# x_org = X.shape[0]
 			# nan_trials = []
 			# for i in range(X.shape[0]):
