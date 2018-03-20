@@ -6,7 +6,6 @@ import torch.optim as optim
 import numpy as np
 import argparse
 from load_data import EEGDataLoader
-torch.manual_seed(1)
 
 class EEGGRU(nn.Module):
 
@@ -176,6 +175,7 @@ def detach(states):
     return [state.detach() for state in states] 
 
 def train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enabled=False, verbose=True):
+    model.train()
     i, j = 0, 0
     iter_count = 0
     accs = []
@@ -217,6 +217,7 @@ def train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enab
 
 
 def accuracy_single_subject(X_s, y_s):
+    model.eval()
     # forward through the model and get the acc across a single subject
     # go across the trials
     predictions = []
@@ -290,6 +291,7 @@ if __name__ == '__main__':
     print('loading data')
     X_train, y_train, X_test, y_test = data_loader.load_all_data()
     print('Beginning training: sequence length of {}'.format(args.seq_len))
+    train_one_by_one(model, loss_function, optimizer, X_train, y_train, gpu_enabled=args.use_gpu, verbose=not args.no_verbose)
     if args.seq_len == 1:
         # train one by one
         if args.batch != 1:
